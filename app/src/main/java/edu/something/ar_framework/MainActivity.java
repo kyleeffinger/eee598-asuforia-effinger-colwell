@@ -3,9 +3,11 @@ package edu.something.ar_framework;
 import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ImageReader;
 import android.os.Handler;
@@ -17,8 +19,10 @@ import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.TextureView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -39,7 +43,7 @@ public class MainActivity extends AppCompatActivity {
             // When SurfaceTextureView is available, pass width and height to setupCamera(), which
             // contacts the camera service and starts process of initializing camera
             setupCamera(width, height);
-
+            connectCamera();
         }
 
         @Override
@@ -69,6 +73,8 @@ public class MainActivity extends AppCompatActivity {
             // Use returned cameraDevice corresponding to specified camera
             // by assigning to our created CameraDevice object
             myCameraDevice = camera;
+            startPreview();
+            Toast.makeText(getApplicationContext(), "Camera connection success!", Toast.LENGTH_SHORT).show();
         }
 
         @Override
@@ -104,6 +110,9 @@ public class MainActivity extends AppCompatActivity {
 
     // Initialize Size object for preview size within app
     private Size myPreviewSize;
+
+    // Create CaptureRequest.Builder object to initialize camera preview using startPreview()
+    private CaptureRequest.Builder myCaptureRequestBuilder;
 
     // Create array to translate device rotation into real-world rotation
     private static SparseIntArray Orientations = new SparseIntArray();
@@ -145,6 +154,9 @@ public class MainActivity extends AppCompatActivity {
             return choices[0];
         }
     }
+
+
+
 
 
     private void setupCamera(int width, int height) {
@@ -206,6 +218,47 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
+    private void startPreview() {
+        // Get a  SurfaceTexture object that camera understands from our TextureView to start preview process
+        SurfaceTexture surfaceTexture = myTextureView.getSurfaceTexture();
+        // Set size based on our preview size method
+        surfaceTexture.setDefaultBufferSize(myPreviewSize.getWidth(), myPreviewSize.getHeight());
+        // Create surface object to display data
+        Surface previewSurface = new Surface(surfaceTexture);
+
+        // setup capture request builder
+        try {
+            myCaptureRequestBuilder = myCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            myCaptureRequestBuilder.addTarget(previewSurface);
+
+            myCameraDevice.createCaptureSession(Arrays.asList(previewSurface),
+                    new CameraCaptureSession.StateCallback() {
+                        @Override
+                        public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
+                            try {
+                                // second argument is what to do with data being previewed via callback
+                                // for preview purposes only, set to null
+                                cameraCaptureSession.setRepeatingRequest(myCaptureRequestBuilder.build(),
+                                        null, myBackgroundHandler);
+                            } catch (CameraAccessException e) {
+                                e.printStackTrace();
+                            }
+                        }
+
+                        @Override
+                        public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
+                            Toast.makeText(getApplicationContext(),
+                                    "Unable to setup camera preview", Toast.LENGTH_SHORT).show();
+                        }
+                    }, null);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+
     private void openCamera() {
     }
 
@@ -234,6 +287,7 @@ public class MainActivity extends AppCompatActivity {
         if (myTextureView.isAvailable()) {
             // if myTextureView is available for use, setupCamera() to initialize camera process
             setupCamera(myTextureView.getWidth(), myTextureView.getHeight());
+            connectCamera();
         }
         // If not, start our SurfaceTextureListener to alert us when TextureView is available
         else {
