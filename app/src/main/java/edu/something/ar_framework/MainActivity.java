@@ -15,11 +15,14 @@ import android.os.HandlerThread;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.Toast;
+
+import org.opencv.android.OpenCVLoader;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +36,21 @@ public class MainActivity extends AppCompatActivity {
     static {
         System.loadLibrary("native-lib");
     }
+
+
+    // Tag used to find OpenCV logging in debug window
+    private static final String CVTAG ="OpenCVTag";
+
+    // Call OpenCVLoader to determine if OpenCV is compiling, and log the result
+    static {
+        if (OpenCVLoader.initDebug()) {
+            Log.d(CVTAG, "OpenCV successfully compiled!");
+        }
+        else {
+            Log.d(CVTAG, "OpenCV did not compile correctly...");
+        }
+    }
+
 
     private TextureView myTextureView;
 
