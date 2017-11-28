@@ -126,59 +126,98 @@ public class MainActivity extends AppCompatActivity {
      using the CameraDevice and disconnects from it. We also define what happens if the CameraDevice encounters a
      serious error.
      */
+    // Instantiate CameraDevice object
     private CameraDevice myCameraDevice;
 
     // Start StateCallback Listener on CameraDevice in order to know when CameraDevice is active.
-    // Returns CameraDevice object corresponding to specified physical camera
+    // Returns CameraDevice object corresponding to specific physical camera
     private final CameraDevice.StateCallback myStateCallback = new CameraDevice.StateCallback() {
+
+        // Define what happens when the camera is opened
         @Override
         public void onOpened(@NonNull CameraDevice camera) {
-            // Use returned cameraDevice corresponding to specified camera
-            // by assigning to our created CameraDevice object
+
+            // When the camera device is opened, assign it to our CameraDevice object so we can use it!
             myCameraDevice = camera;
+
+            // Once our camera is selected, start the camera preview so we can see what the camera sees
             startPreview();
+
+            // For initial troubleshooting purposes. Display success message when camera is opened
 //            Toast.makeText(getApplicationContext(), "Camera connection success!", Toast.LENGTH_SHORT).show();
+
+            // When the camera opens, we also want to prove that OpenCV has compiled correctly, so we display the
+            // OpenCV VERSION string gathered above and use Toast to display it on the screen temporarily.
             Toast.makeText(getApplicationContext(), version, Toast.LENGTH_LONG).show();
         }
 
+        // Define what happens when the camera is closed (disconnected)
         @Override
         public void onDisconnected(@NonNull CameraDevice cameraDevice) {
-            // Free up CameraDevice resources when not connected to specified camera
+            // Free up CameraDevice resources and close our CameraDevice
             cameraDevice.close();
+            // Reset our CameraDevice object so that it can be assigned a new camera in the future
             myCameraDevice = null;
         }
 
+        // Define what happens when the camera has a serious error
         @Override
         public void onError(@NonNull CameraDevice cameraDevice, int i) {
-            // Free up CameraDevice resources when not connected to specified camera due to error
+            // Perform same actions as when disconnected
             cameraDevice.close();
             myCameraDevice = null;
         }
     };
 
 
+    /**
+    The ImageReader class is a class that allows applications to directly access image data that is rendered to a
+     surface, in this case our SurfaceTexture defined in our TextureView. As with all listeners, the nested public
+     class ImageReader.OnImageAvailableListener acts as the interface between the Android HAL and our application.
+     The listener is used to define the callback function that occurs when a new image is available from the camera2
+     device we're using. In this case, the callback fires every time a new frame is available from the device camera.
+     For example, if the camera is capturing frames at 30 FPS, this callback will fire 30 times/sec. For our purposes,
+     we want to take the image from the camera, and estimate the camera pose based on the features OpenCV detects in
+     the image. Therefore, when a new frame (image) is available, we want to pass it to nativePoseEstimation() where
+     OpenCV will be used to determine the pose and compare this frames points against the reference points. It will
+     then return a rotation and translation vector, that we will then pass to the PoseListener defined in MainActivity.
+     The PoseListener callback method onPose() will then use these vectors to draw a cube on the camera image.
+     */
+    // Instantiate ImageReader.OnImageAvailableListener object
     private final ImageReader.OnImageAvailableListener myImageAvailableListener
             = new ImageReader.OnImageAvailableListener() {
+
+        // Define what happens when a new (preview) frame is available from the camera
         @Override
         public void onImageAvailable(ImageReader imageReader) {
 
+            //TODO: Call nativePoseEstimation() to get rotation and translation (R and T) vectors
+
+            //TODO: Call PoseListeners callback function, onPose(), passing the R and T vectors
+
         }
     };
 
-    // Create background handler and thread for processing camera tasks behind UI
+    /**
+    Several objects will be needed in multiple methods used to gain access and control of the physical camera. For
+     the sake of readability in these methods, the single-line object instantiations are collected here, with a
+     single line comment meant to give a general idea of how the object will be used.
+     */
+
+    // Background Handler and HandlerThread for processing camera tasks behind UI, to keep UI seamless
     private HandlerThread myBackgroundHandlerThread;
     private Handler myBackgroundHandler;
 
     // Initialize string to contain CameraID when returned from CameraManager
     private String myCameraID;
 
-    // Initialize Size object for preview size within app
+    // Initialize Size object for preview size. Preview size object contains dimensions for our Surface
     private Size myPreviewSize;
 
     // Create CaptureRequest.Builder object to initialize camera preview using startPreview()
     private CaptureRequest.Builder myCaptureRequestBuilder;
 
-    // Listener for orientation changes in order to update the camera preview
+    // Listener for orientation changes in order to update the camera preview size as device rotates
     private OrientationEventListener myOrientationEventListener;
 
     // Create array to translate device rotation into real-world rotation
@@ -191,6 +230,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    /**
+    We want to make sure that the preview window (Surface) we're displaying our images on matches the camera
+     resolution. This is something we could probably just take for granted in this case, but also seems like
+     a good thing to be sure of, and provides more coding practice... We're going to compare the area of the
+     camera resolution and the current preview area to determine if they are compatible. Then we will find a
+     list of options, and choose the best match.
+     */
     // Setup camera preview resolution based on camera sensor resolution
     private static class compareArea implements Comparator<Size> {
 
@@ -329,10 +375,40 @@ public class MainActivity extends AppCompatActivity {
     private void openCamera() {
     }
 
+
+
+    /******************************* Start of Activity Lifecycle *******************************************/
+
+
+    /**
+    As a user opens, navigates through, leaves, and returns to our application, our Activity instance goes
+     through many different states in what Google calls the Activity Lifecycle. When the Activity transitions
+     into a new state, the Android system invokes the corresponding callback. There are 6 core callbacks,
+     referred to as onCreate(), onStart(), onResume(), onPause(), onStop(), and onDestroy(). Of particular
+     importance to us are onCreate(), onResume(), and onPause(). onCreate is called when the Activity is
+     first launched, meaning that it is not already in memory. This must be implemented, or the application
+     will not run. In this method, we want to perform the actions and logic that should only happen once
+     throughout the lifecycle of the Activity (like initialize objects and variables). The Activity does not
+     stay in this state after completing these tasks. The Activity interacts with the user in the onResume()
+     state. The app stays in this state until something takes the focus away from the app (such as opening
+     another app or going to the home screen). When the application goes to the background like this, the
+     app will transistion into the onPause() state. In our case, the onCreate() state will be used to setup
+     the interface between the ASUForia library and the MainActivity, as well as define onPose() to perform
+     the cube drawing. onResume() and onPause() will be used to ensure that pose estimation starts when the
+     app comes to the foreground and ends when the app goes to the background.
+     */
+
+    // Define what happens when the application is first opened
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        //TODO: Create an ASUForia object
+
+        //TODO: Define PoseListener object to act as interface between ASUForia library and MainActivity
+
+        //TODO: Define PoseListener callback function, onPose() which will use OpenCV to draw cube on image
 
         myTextureView = (TextureView) findViewById(R.id.cameraPreview);
 
@@ -346,7 +422,7 @@ public class MainActivity extends AppCompatActivity {
 //        tv.setText(stringFromJNI());
     }
 
-    // Define what happens when our application comes into the foreground
+    // Define what happens when our application enters and stays in the foreground
     @Override
     protected void onResume() {
         // call super constructor in order to apply onResume() to entire Activity
@@ -365,6 +441,10 @@ public class MainActivity extends AppCompatActivity {
         else {
             myTextureView.setSurfaceTextureListener(mySurfaceTextureListener);
         }
+
+        //TODO: Call startEstimation() setup camera and pass to onImageAvailable to nativePoseEstimation() to onPose()
+        // startEstimation() only needs to be called here since onResume() will be called when the application
+        // is first opened, and for the duration the app is in the foreground.
     }
 
 
@@ -378,8 +458,15 @@ public class MainActivity extends AppCompatActivity {
         // Close the camera being used
         closeCamera();
 
-        // endEstimation() function call
+        //TODO: Call endEstimation() to stop the camera and free resources when camera is not visible
     }
+
+
+    /********************************* End of Activity Lifecycle *******************************************/
+
+
+
+
 
 
     // Create method to close camera when no longer needed to free up resources
