@@ -1,6 +1,8 @@
 package edu.something.ar_framework;
 
 import android.content.Context;
+import android.os.Build;
+import android.util.AttributeSet;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -18,11 +20,14 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
+import android.view.OrientationEventListener;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.Toast;
 
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.*;
+import org.opencv.android.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -30,14 +35,25 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import static org.opencv.core.Core.VERSION;
+import static org.opencv.core.Core.VERSION_MAJOR;
+
+import edu.something.ar_framework.ASUForia;
+
 public class MainActivity extends AppCompatActivity {
 
-    // Used to load the 'native-lib' library on application startup.
+    /**
+        Load the 'native-lib' library on application startup. This library contains nativePoseEstimation(),
+        which is used to get the image features/points and compare them to the reference image
+        features/points. It also returns the rotation and translation vectors used in onPose() to draw
+        the cube in the camera image.
+     */
     static {
         System.loadLibrary("native-lib");
     }
 
 
+    //TODO: For checkpoint purposes, check that OpenCV Compiles, log a tag, and print message to UI window
     // Tag used to find OpenCV logging in debug window
     private static final String CVTAG ="OpenCVTag";
 
@@ -51,11 +67,26 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // Get OpenCV version using built-in getVersion(), referenced as "VERSION" in org.opencv.core.Core
+    // This version will be outputted to the camera preview when camera onOpened() within CameraDevice.StateCallback()
+    private static String version = VERSION;
 
+    /**
+    A TextureView is a class in Android that can be used to display an image stream. It does not create a new window,
+     and therefore can be moved or transformed within a particular activity. In this case, we are going to use our
+     TextureView to continuously stream the camera preview images to the user interface, where onPose() will draw a cube
+     on the image preview. The TextureView is used through its SurfaceTexture, which is gathered using a
+     SurfaceTextureListener interface. The SurfaceTextureListener has several different callback functions, based on the
+     type of event detected by the listener. This listener and associated callbacks are defined below.
+     */
+    // Instantiate TextureView object
     private TextureView myTextureView;
 
+    // Setup SurfaceTexture listener object, which is type TextureView.SurfaceTextureListener
     private final TextureView.SurfaceTextureListener mySurfaceTextureListener
             = new TextureView.SurfaceTextureListener() {
+
+        // Callback that defines what happens when the SurfaceTexture is available for use
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
             // When SurfaceTextureView is available, pass width and height to setupCamera(), which
@@ -64,16 +95,19 @@ public class MainActivity extends AppCompatActivity {
             connectCamera();
         }
 
+        // Callback that defines what happens when the SurfaceTexture size is changed. In this case, rotation.
         @Override
         public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
 
         }
 
+        // Callback that defines what happens when the SurfaceTexture is closed
         @Override
         public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
             return false;
         }
 
+        // Callback that defines what happens when the SurfaceTexture is altered in anyway. Not happening here.
         @Override
         public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {
 
@@ -81,6 +115,17 @@ public class MainActivity extends AppCompatActivity {
     };
 
 
+    /**
+    A CameraDevice is a class in Android that represents a single hardware camera connected to an Android device. In
+     order to use a CameraDevice, the user must have allowed access through the camera permissions. We are using the
+     newest Android camera API, called the camera2 API. There are several "states" that the camera can be in, and each
+     state has a specific method associated with it. In this case, we are going to use the camera to provide the
+     continuous vision needed to draw a cube in the camera preview. Therefore, we need to define what happens when the
+     camera is opened through the public class onOpened(). We also don't want to continue to use the camera when the app
+     is no longer in use, so we use the public class onDisconnected() to define what happens when the app is no longer
+     using the CameraDevice and disconnects from it. We also define what happens if the CameraDevice encounters a
+     serious error.
+     */
     private CameraDevice myCameraDevice;
 
     // Start StateCallback Listener on CameraDevice in order to know when CameraDevice is active.
@@ -92,7 +137,8 @@ public class MainActivity extends AppCompatActivity {
             // by assigning to our created CameraDevice object
             myCameraDevice = camera;
             startPreview();
-            Toast.makeText(getApplicationContext(), "Camera connection success!", Toast.LENGTH_SHORT).show();
+//            Toast.makeText(getApplicationContext(), "Camera connection success!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), version, Toast.LENGTH_LONG).show();
         }
 
         @Override
@@ -132,6 +178,9 @@ public class MainActivity extends AppCompatActivity {
     // Create CaptureRequest.Builder object to initialize camera preview using startPreview()
     private CaptureRequest.Builder myCaptureRequestBuilder;
 
+    // Listener for orientation changes in order to update the camera preview
+    private OrientationEventListener myOrientationEventListener;
+
     // Create array to translate device rotation into real-world rotation
     private static SparseIntArray Orientations = new SparseIntArray();
     static {
@@ -168,7 +217,7 @@ public class MainActivity extends AppCompatActivity {
             return Collections.min(bigEnoughForDisplay, new compareArea());
         }
         else {
-            // if not options, just return a default value
+            // if no options, just return a default value
             return choices[0];
         }
     }
@@ -287,6 +336,11 @@ public class MainActivity extends AppCompatActivity {
 
         myTextureView = (TextureView) findViewById(R.id.cameraPreview);
 
+        // Complete list of actions in text file
+
+
+
+
         // Example of a call to a native method
 //        TextView tv = (TextView) findViewById(R.id.sample_text);
 //        tv.setText(stringFromJNI());
@@ -323,6 +377,8 @@ public class MainActivity extends AppCompatActivity {
         stopBackgroundThread();
         // Close the camera being used
         closeCamera();
+
+        // endEstimation() function call
     }
 
 

@@ -1,69 +1,23 @@
 package edu.something.ar_framework;
 
-import android.graphics.SurfaceTexture;
-import android.hardware.camera2.CameraDevice;
-import android.media.ImageReader;
-import android.support.annotation.NonNull;
+import android.media.Image;
 import android.support.v7.app.AppCompatActivity;
-import android.view.TextureView;
+import android.view.Surface;
 
 
 public class ASUForia extends AppCompatActivity {
 
-    private TextureView myTextureView;
-
-    private final TextureView.SurfaceTextureListener mySurfaceTextureListener
-            = new TextureView.SurfaceTextureListener() {
-        @Override
-        public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
-
-        }
-
-        @Override
-        public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
-
-        }
-
-        @Override
-        public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
-            return false;
-        }
-
-        @Override
-        public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {
-
-        }
-    };
+    ASUForia(PoseListener listener, Image referenceImage, Surface cameraSurface) {
 
 
-    private CameraDevice myCameraDevice;
-
-    private final CameraDevice.StateCallback myStateCallback = new CameraDevice.StateCallback() {
-        @Override
-        public void onOpened(@NonNull CameraDevice cameraDevice) {
-            myCameraDevice = cameraDevice;
-        }
-
-        @Override
-        public void onDisconnected(@NonNull CameraDevice cameraDevice) {
-            cameraDevice.close();
-            myCameraDevice = null;
-        }
-
-        @Override
-        public void onError(@NonNull CameraDevice cameraDevice, int i) {
-            cameraDevice.close();
-            myCameraDevice = null;
-        }
-    };
+        //TODO: Create startEstimation() that will setup and open the camera
+        // startEstimation()
 
 
-    private final ImageReader.OnImageAvailableListener myImageAvailableListener
-            = new ImageReader.OnImageAvailableListener() {
-        @Override
-        public void onImageAvailable(ImageReader imageReader) {
+        //TODO: Create onImageAvailable() which will be used to pass the image to nativePoseEstimation()
 
-        }
-    };
+
+        //TODO: Create endEstimation() that will close the camera
+    }
 
 }
