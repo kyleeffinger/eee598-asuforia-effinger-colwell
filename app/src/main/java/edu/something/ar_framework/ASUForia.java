@@ -8,16 +8,19 @@ import android.view.Surface;
 public class ASUForia extends AppCompatActivity {
 
     ASUForia(PoseListener listener, Image referenceImage, Surface cameraSurface) {
+    }
+
+    //TODO: Create startEstimation() that will setup and open the camera
+    private void startEstimation() {
+
+    }
+
+    //TODO: Create onImageAvailable() which will be used to pass the image to nativePoseEstimation()
 
 
-        //TODO: Create startEstimation() that will setup and open the camera
-        // startEstimation()
+    //TODO: Create endEstimation() that will close the camera
+    private void endEstimation() {
 
-
-        //TODO: Create onImageAvailable() which will be used to pass the image to nativePoseEstimation()
-
-
-        //TODO: Create endEstimation() that will close the camera
     }
 
 }

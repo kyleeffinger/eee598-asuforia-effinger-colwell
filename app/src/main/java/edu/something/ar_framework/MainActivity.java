@@ -1,6 +1,7 @@
 package edu.something.ar_framework;
 
 import android.content.Context;
+import android.media.Image;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.graphics.SurfaceTexture;
@@ -70,6 +71,126 @@ public class MainActivity extends AppCompatActivity {
     // Get OpenCV version using built-in getVersion(), referenced as "VERSION" in org.opencv.core.Core
     // This version will be outputted to the camera preview when camera onOpened() within CameraDevice.StateCallback()
     private static String version = VERSION;
+
+
+    /**
+     Several objects will be needed in multiple methods used to gain access and control of the physical camera. For
+     the sake of readability in these methods, the single-line object instantiations are collected here, with a
+     single line comment meant to give a general idea of how the object will be used.
+     */
+
+    // Background Handler and HandlerThread for processing camera tasks behind UI, to keep UI seamless
+    private HandlerThread myBackgroundHandlerThread;
+    private Handler myBackgroundHandler;
+
+    // Initialize string to contain CameraID when returned from CameraManager
+    private String myCameraID;
+
+    // Initialize Size object for preview size. Preview size object contains dimensions for our Surface
+    private Size myPreviewSize;
+
+    // Create CaptureRequest.Builder object to initialize camera preview using startPreview()
+    private CaptureRequest.Builder myCaptureRequestBuilder;
+
+    // Listener for orientation changes in order to update the camera preview size as device rotates
+    private OrientationEventListener myOrientationEventListener;
+
+
+
+    /******************************* Start of Activity Lifecycle *******************************************/
+
+
+    /**
+     As a user opens, navigates through, leaves, and returns to our application, our Activity instance goes
+     through many different states in what Google calls the Activity Lifecycle. When the Activity transitions
+     into a new state, the Android system invokes the corresponding callback. There are 6 core callbacks,
+     referred to as onCreate(), onStart(), onResume(), onPause(), onStop(), and onDestroy(). Of particular
+     importance to us are onCreate(), onResume(), and onPause(). onCreate is called when the Activity is
+     first launched, meaning that it is not already in memory. This must be implemented, or the application
+     will not run. In this method, we want to perform the actions and logic that should only happen once
+     throughout the lifecycle of the Activity (like initialize objects and variables). The Activity does not
+     stay in this state after completing these tasks. The Activity interacts with the user in the onResume()
+     state. The app stays in this state until something takes the focus away from the app (such as opening
+     another app or going to the home screen). When the application goes to the background like this, the
+     app will transition into the onPause() state. In our case, the onCreate() state will be used to setup
+     the interface between the ASUForia library and the MainActivity, as well as define onPose() to perform
+     the cube drawing. onResume() and onPause() will be used to ensure that pose estimation starts when the
+     app comes to the foreground and ends when the app goes to the background.
+     */
+
+    // Define what happens when the application is first opened
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        //TODO: Define PoseListener object to act as interface between ASUForia library and MainActivity
+        final PoseListener myPoseListener = new PoseListener() {
+
+            //TODO: Define PoseListener callback function, onPose() which will use OpenCV to draw cube on image
+            public void onPose(Image cameraFrame, float[] rvec, float[] tvec){
+
+                // Paint cameraSurface with a cube as an overlay on the marker in the image using OpenCV.
+
+            }
+
+        };
+
+        //TODO: Create an ASUForia object
+        ASUForia asuForia = new ASUForia(PoseListener myPoseListener, Image image, Surface cameraSurface);
+
+
+    }
+
+    // Define what happens when our application enters and stays in the foreground
+    @Override
+    protected void onResume() {
+        // call super constructor in order to apply onResume() to entire Activity
+        super.onResume();
+
+        // Start background thread
+        startBackgroundThread();
+
+        // Assign our TextureView the correct cameraPreview
+        myTextureView = (TextureView) findViewById(R.id.cameraPreview);
+
+        // See if our TextureView is available
+        if (myTextureView.isAvailable()) {
+            // if myTextureView is available for use, setupCamera() to initialize camera process
+            setupCamera(myTextureView.getWidth(), myTextureView.getHeight());
+            connectCamera();
+        }
+        // If not, start our SurfaceTextureListener to alert us when TextureView is available
+        else {
+            myTextureView.setSurfaceTextureListener(mySurfaceTextureListener);
+        }
+
+        //TODO: Call startEstimation() setup camera and pass to onImageAvailable to nativePoseEstimation() to onPose()
+        // startEstimation() only needs to be called here since onResume() will be called when the application
+        // is first opened, and every time the app is brought into the foreground.
+    }
+
+
+    // Define what happens when app is put in the background
+    @Override
+    protected void onPause() {
+        // Call super constructor to apply to entire activity
+        super.onPause();
+        // stop background thread
+        stopBackgroundThread();
+        // Close the camera being used
+        closeCamera();
+
+        //TODO: Call endEstimation() to stop the camera and free resources when camera is not visible
+    }
+
+
+    /********************************* End of Activity Lifecycle *******************************************/
+
+
+
+
+    /******************************* Start of Camera2 API Methods *******************************************/
 
     /**
     A TextureView is a class in Android that can be used to display an image stream. It does not create a new window,
@@ -198,28 +319,6 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    /**
-    Several objects will be needed in multiple methods used to gain access and control of the physical camera. For
-     the sake of readability in these methods, the single-line object instantiations are collected here, with a
-     single line comment meant to give a general idea of how the object will be used.
-     */
-
-    // Background Handler and HandlerThread for processing camera tasks behind UI, to keep UI seamless
-    private HandlerThread myBackgroundHandlerThread;
-    private Handler myBackgroundHandler;
-
-    // Initialize string to contain CameraID when returned from CameraManager
-    private String myCameraID;
-
-    // Initialize Size object for preview size. Preview size object contains dimensions for our Surface
-    private Size myPreviewSize;
-
-    // Create CaptureRequest.Builder object to initialize camera preview using startPreview()
-    private CaptureRequest.Builder myCaptureRequestBuilder;
-
-    // Listener for orientation changes in order to update the camera preview size as device rotates
-    private OrientationEventListener myOrientationEventListener;
-
     // Create array to translate device rotation into real-world rotation
     private static SparseIntArray Orientations = new SparseIntArray();
     static {
@@ -228,48 +327,6 @@ public class MainActivity extends AppCompatActivity {
         Orientations.append(Surface.ROTATION_180, 180);
         Orientations.append(Surface.ROTATION_270, 270);
     }
-
-
-    /**
-    We want to make sure that the preview window (Surface) we're displaying our images on matches the camera
-     resolution. This is something we could probably just take for granted in this case, but also seems like
-     a good thing to be sure of, and provides more coding practice... We're going to compare the area of the
-     camera resolution and the current preview area to determine if they are compatible. Then we will find a
-     list of options, and choose the best match.
-     */
-    // Setup camera preview resolution based on camera sensor resolution
-    private static class compareArea implements Comparator<Size> {
-
-        @Override
-        public int compare(Size lhs, Size rhs) {
-            return Long.signum((long) lhs.getWidth() * lhs.getHeight() / (long) rhs.getWidth() * rhs.getHeight());
-        }
-    }
-
-    private static Size choosePreviewSize(Size[] choices, int width, int height) {
-        List<Size> bigEnoughForDisplay = new ArrayList<Size>();
-        for (Size option : choices) {
-            //Check if option is big enough for display
-            if (option.getHeight() == option.getWidth() * height/width
-                    && option.getWidth() >= width
-                    && option.getHeight() >= height) {
-                // if it is, add it to list of options
-                bigEnoughForDisplay.add(option);
-            }
-        }
-
-        // if at least one option exists, return minimum value
-        if (bigEnoughForDisplay.size() > 0) {
-            return Collections.min(bigEnoughForDisplay, new compareArea());
-        }
-        else {
-            // if no options, just return a default value
-            return choices[0];
-        }
-    }
-
-
-
 
 
     private void setupCamera(int width, int height) {
@@ -332,6 +389,71 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    private void openCamera() {
+    }
+
+
+    /**
+     A simple method closeCamera() will be created to simplify the process needed to close the camera, since the camera
+     will be closed in multiple methods
+     */
+    private void closeCamera() {
+        // if myCameraDevice is active, then close it
+        if (myCameraDevice != null) {
+            myCameraDevice.close();
+            // set the camera device to null so that it can be assigned a new CameraDevice in the future
+            myCameraDevice = null;
+        }
+    }
+
+
+    /******************************* End of Camera2 API Methods *******************************************/
+
+
+
+
+    /******************************* Start of Camera Preview Methods **************************************/
+
+
+    /**
+    We want to make sure that the preview window (Surface) we're displaying our images on matches the camera
+     resolution. This is something we could probably just take for granted in this case, but also seems like
+     a good thing to be sure of, and provides more coding practice... We're going to compare the area of the
+     camera resolution and the current preview area to determine if they are compatible. Then we will find a
+     list of options, and choose the best match.
+     */
+    // Setup camera preview resolution based on camera sensor resolution
+    private static class compareArea implements Comparator<Size> {
+
+        @Override
+        public int compare(Size lhs, Size rhs) {
+            return Long.signum((long) lhs.getWidth() * lhs.getHeight() / (long) rhs.getWidth() * rhs.getHeight());
+        }
+    }
+
+    private static Size choosePreviewSize(Size[] choices, int width, int height) {
+        List<Size> bigEnoughForDisplay = new ArrayList<Size>();
+        for (Size option : choices) {
+            //Check if option is big enough for display
+            if (option.getHeight() == option.getWidth() * height/width
+                    && option.getWidth() >= width
+                    && option.getHeight() >= height) {
+                // if it is, add it to list of options
+                bigEnoughForDisplay.add(option);
+            }
+        }
+
+        // if at least one option exists, return minimum value
+        if (bigEnoughForDisplay.size() > 0) {
+            return Collections.min(bigEnoughForDisplay, new compareArea());
+        }
+        else {
+            // if no options, just return a default value
+            return choices[0];
+        }
+    }
+
+
     private void startPreview() {
         // Get a  SurfaceTexture object that camera understands from our TextureView to start preview process
         SurfaceTexture surfaceTexture = myTextureView.getSurfaceTexture();
@@ -372,121 +494,49 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void openCamera() {
+    private static int sensorToDeviceRotation(CameraCharacteristics cameraCharacteristics, int deviceOrientation) {
+        int sensorOrientation = cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+        deviceOrientation = Orientations.get(deviceOrientation);
+        return (sensorOrientation + deviceOrientation + 360) % 360;
     }
 
 
+    /******************************* End of Camera Preview Methods *****************************************/
 
-    /******************************* Start of Activity Lifecycle *******************************************/
+
+
+
+    /******************************* Start of BackgroundHandlerThread Setup *******************************************/
+
+
 
 
     /**
-    As a user opens, navigates through, leaves, and returns to our application, our Activity instance goes
-     through many different states in what Google calls the Activity Lifecycle. When the Activity transitions
-     into a new state, the Android system invokes the corresponding callback. There are 6 core callbacks,
-     referred to as onCreate(), onStart(), onResume(), onPause(), onStop(), and onDestroy(). Of particular
-     importance to us are onCreate(), onResume(), and onPause(). onCreate is called when the Activity is
-     first launched, meaning that it is not already in memory. This must be implemented, or the application
-     will not run. In this method, we want to perform the actions and logic that should only happen once
-     throughout the lifecycle of the Activity (like initialize objects and variables). The Activity does not
-     stay in this state after completing these tasks. The Activity interacts with the user in the onResume()
-     state. The app stays in this state until something takes the focus away from the app (such as opening
-     another app or going to the home screen). When the application goes to the background like this, the
-     app will transistion into the onPause() state. In our case, the onCreate() state will be used to setup
-     the interface between the ASUForia library and the MainActivity, as well as define onPose() to perform
-     the cube drawing. onResume() and onPause() will be used to ensure that pose estimation starts when the
-     app comes to the foreground and ends when the app goes to the background.
+    A background thread is needed to perform tasks on the camera without interrupting the user interface. In this case,
+     this is needed to not interrupt the camera preview and OpenCV-based cube drawing happening continuously in the
+     user interface. We need a method to start and stop the background thread, so that when the app goes into the
+     background, the background thread can be stopped to free up resources for other applications.
      */
-
-    // Define what happens when the application is first opened
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        //TODO: Create an ASUForia object
-
-        //TODO: Define PoseListener object to act as interface between ASUForia library and MainActivity
-
-        //TODO: Define PoseListener callback function, onPose() which will use OpenCV to draw cube on image
-
-        myTextureView = (TextureView) findViewById(R.id.cameraPreview);
-
-        // Complete list of actions in text file
-
-
-
-
-        // Example of a call to a native method
-//        TextView tv = (TextView) findViewById(R.id.sample_text);
-//        tv.setText(stringFromJNI());
-    }
-
-    // Define what happens when our application enters and stays in the foreground
-    @Override
-    protected void onResume() {
-        // call super constructor in order to apply onResume() to entire Activity
-        super.onResume();
-
-        // Start background thread
-        startBackgroundThread();
-
-        // See if our TextureView is available
-        if (myTextureView.isAvailable()) {
-            // if myTextureView is available for use, setupCamera() to initialize camera process
-            setupCamera(myTextureView.getWidth(), myTextureView.getHeight());
-            connectCamera();
-        }
-        // If not, start our SurfaceTextureListener to alert us when TextureView is available
-        else {
-            myTextureView.setSurfaceTextureListener(mySurfaceTextureListener);
-        }
-
-        //TODO: Call startEstimation() setup camera and pass to onImageAvailable to nativePoseEstimation() to onPose()
-        // startEstimation() only needs to be called here since onResume() will be called when the application
-        // is first opened, and for the duration the app is in the foreground.
-    }
-
-
-    // Define what happens when app is put in the background
-    @Override
-    protected void onPause() {
-        // Call super constructor to apply to entire activity
-        super.onPause();
-        // stop background thread
-        stopBackgroundThread();
-        // Close the camera being used
-        closeCamera();
-
-        //TODO: Call endEstimation() to stop the camera and free resources when camera is not visible
-    }
-
-
-    /********************************* End of Activity Lifecycle *******************************************/
-
-
-
-
-
-
-    // Create method to close camera when no longer needed to free up resources
-    private void closeCamera() {
-        // if myCameraDevice is active, then close it
-        if (myCameraDevice != null) {
-            myCameraDevice.close();
-            myCameraDevice = null;
-        }
-    }
-
+    // Method to start the background thread, using the BackgroundHandlerThread object
     private void startBackgroundThread() {
+        // Set our BackgroundHandlerthread object to a new HandlerThread, give it a name, of type string.
+        // HandlerThread is used because it is a thread that has a Looper
         myBackgroundHandlerThread = new HandlerThread("Camera2API");
+        // Start the BackgroundHandlerThread
         myBackgroundHandlerThread.start();
+        // Handler is needed to send and process objects associated with a thread.
+        // Associate our BackgroundHandler with the Looper of our BackgroundHandlerThread
         myBackgroundHandler = new Handler(myBackgroundHandlerThread.getLooper());
     }
 
+    // Method to stop the background thread
     private void stopBackgroundThread() {
+        /* Terminate our thread's looper as soon as all remaining messages in the que that are already due to be
+        delivered have been processed, as opposed to just terminating the looper immediately. */
         myBackgroundHandlerThread.quitSafely();
+        // Try-catch statement added per Android Studio's request.
         try {
+            // Set the thread and handler to null so they can be reassigned in the future
             myBackgroundHandlerThread.join();
             myBackgroundHandlerThread = null;
             myBackgroundHandler = null;
@@ -495,12 +545,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /******************************* End of BackgroundHandlerThread Setup *********************************************/
 
-    private static int sensorToDeviceRotation(CameraCharacteristics cameraCharacteristics, int deviceOrientation) {
-        int sensorOrientation = cameraCharacteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
-        deviceOrientation = Orientations.get(deviceOrientation);
-        return (sensorOrientation + deviceOrientation + 360) % 360;
-    }
 
     /**
      * A native method that is implemented by the 'native-lib' native library,
