@@ -1,6 +1,6 @@
 /*
  * This file is auto-generated.  DO NOT MODIFY.
- * Original file: /Users/kyleeffinger/AndroidStudioProjects/eee598-asuforia-effinger-colwell/openCVLibrary331/src/main/aidl/org/opencv/engine/OpenCVEngineInterface.aidl
+ * Original file: /Users/kyleeffinger/Documents/EEE598/eee598-asuforia-effinger-colwell/openCVLibrary331/src/main/aidl/org/opencv/engine/OpenCVEngineInterface.aidl
  */
 package org.opencv.engine;
 /**
