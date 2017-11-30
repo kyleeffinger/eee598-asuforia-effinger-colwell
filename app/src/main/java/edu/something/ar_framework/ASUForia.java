@@ -1,5 +1,6 @@
 package edu.something.ar_framework;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -29,7 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 
 
-public class ASUForia extends AppCompatActivity {
+public class ASUForia {
 
 
     /**
@@ -42,10 +43,12 @@ public class ASUForia extends AppCompatActivity {
         System.loadLibrary("native-lib");
     }
 
+    private PoseListener mylistener;
+    private Activity myAct;
     /*************************************** ASUForia Constructor ***************************************/
-    ASUForia(PoseListener listener, Image referenceImage, Surface cameraSurface) {
-    }
-    ASUForia(){
+    ASUForia(PoseListener listener_arg, Image referenceImage, Surface cameraSurface, Activity act) {
+        mylistener = listener_arg;
+        myAct = act;
     }
 
 
@@ -71,17 +74,20 @@ public class ASUForia extends AppCompatActivity {
     // Listener for orientation changes in order to update the camera preview size as device rotates
     private OrientationEventListener myOrientationEventListener;
 
+    // Instantiate TextureView object
+    private TextureView myTextureView;
+
 
 
     /*************************************** Begin startEstimation() ************************************/
     //TODO: Create startEstimation() that will setup and open the camera
-    public void startEstimation() {
-
+    public void startEstimation(TextureView myTextureView) {
+        this.myTextureView = myTextureView;
         // Start background thread
         startBackgroundThread();
 
         // Assign our TextureView the correct cameraPreview
-        myTextureView = (TextureView) findViewById(R.id.cameraPreview);
+        //myTextureView = (TextureView) findViewById(R.id.cameraPreview);
 
         // See if our TextureView is available
         if (myTextureView.isAvailable()) {
@@ -101,6 +107,34 @@ public class ASUForia extends AppCompatActivity {
 
     /*************************************** Begin onImageAvailable() ***********************************/
     //TODO: Create onImageAvailable() which will be used to pass the image to nativePoseEstimation()
+
+    /**
+     * The ImageReader class is a class that allows applications to directly access image data that is rendered to a
+     * surface, in this case our SurfaceTexture defined in our TextureView. As with all listeners, the nested public
+     * class ImageReader.OnImageAvailableListener acts as the interface between the Android HAL and our application.
+     * The listener is used to define the callback function that occurs when a new image is available from the camera2
+     * device we're using. In this case, the callback fires every time a new frame is available from the device camera.
+     * For example, if the camera is capturing frames at 30 FPS, this callback will fire 30 times/sec. For our purposes,
+     * we want to take the image from the camera, and estimate the camera pose based on the features OpenCV detects in
+     * the image. Therefore, when a new frame (image) is available, we want to pass it to nativePoseEstimation() where
+     * OpenCV will be used to determine the pose and compare this frames points against the reference points. It will
+     * then return a rotation and translation vector, that we will then pass to the PoseListener defined in MainActivity.
+     * The PoseListener callback method onPose() will then use these vectors to draw a cube on the camera image.
+     */
+    // Instantiate ImageReader.OnImageAvailableListener object
+    private final ImageReader.OnImageAvailableListener myImageAvailableListener
+            = new ImageReader.OnImageAvailableListener() {
+
+        // Define what happens when a new (preview) frame is available from the camera
+        @Override
+        public void onImageAvailable(ImageReader imageReader) {
+
+            //TODO: Call nativePoseEstimation() to get rotation and translation (R and T) vectors
+
+            //TODO: Call PoseListeners callback function, onPose(), passing the R and T vectors
+
+        }
+    };
 
 
     /*************************************** End onImageAvailable() *************************************/
@@ -136,8 +170,6 @@ public class ASUForia extends AppCompatActivity {
      * SurfaceTextureListener interface. The SurfaceTextureListener has several different callback functions, based on the
      * type of event detected by the listener. This listener and associated callbacks are defined below.
      */
-    // Instantiate TextureView object
-    private TextureView myTextureView;
 
     // Setup SurfaceTexture listener object, which is type TextureView.SurfaceTextureListener
     private final TextureView.SurfaceTextureListener mySurfaceTextureListener
@@ -227,34 +259,6 @@ public class ASUForia extends AppCompatActivity {
     };
 
 
-    /**
-     * The ImageReader class is a class that allows applications to directly access image data that is rendered to a
-     * surface, in this case our SurfaceTexture defined in our TextureView. As with all listeners, the nested public
-     * class ImageReader.OnImageAvailableListener acts as the interface between the Android HAL and our application.
-     * The listener is used to define the callback function that occurs when a new image is available from the camera2
-     * device we're using. In this case, the callback fires every time a new frame is available from the device camera.
-     * For example, if the camera is capturing frames at 30 FPS, this callback will fire 30 times/sec. For our purposes,
-     * we want to take the image from the camera, and estimate the camera pose based on the features OpenCV detects in
-     * the image. Therefore, when a new frame (image) is available, we want to pass it to nativePoseEstimation() where
-     * OpenCV will be used to determine the pose and compare this frames points against the reference points. It will
-     * then return a rotation and translation vector, that we will then pass to the PoseListener defined in MainActivity.
-     * The PoseListener callback method onPose() will then use these vectors to draw a cube on the camera image.
-     */
-    // Instantiate ImageReader.OnImageAvailableListener object
-    private final ImageReader.OnImageAvailableListener myImageAvailableListener
-            = new ImageReader.OnImageAvailableListener() {
-
-        // Define what happens when a new (preview) frame is available from the camera
-        @Override
-        public void onImageAvailable(ImageReader imageReader) {
-
-            //TODO: Call nativePoseEstimation() to get rotation and translation (R and T) vectors
-
-            //TODO: Call PoseListeners callback function, onPose(), passing the R and T vectors
-
-        }
-    };
-
     // Create array to translate device rotation into real-world rotation
     private static SparseIntArray Orientations = new SparseIntArray();
 
@@ -271,7 +275,7 @@ public class ASUForia extends AppCompatActivity {
         Connect CameraManager object to device camera service in order to get information
         about camera hardware
         */
-        CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        CameraManager cameraManager = (CameraManager) myAct.getSystemService(Context.CAMERA_SERVICE);
         // Get a list of cameras contained in device
         try {
             // Traverse through all available cameraID's on device
@@ -288,7 +292,7 @@ public class ASUForia extends AppCompatActivity {
                 StreamConfigurationMap map = cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 
                 // Get device orientation
-                int deviceOrientation = getWindowManager().getDefaultDisplay().getRotation();
+                int deviceOrientation = myAct.getWindowManager().getDefaultDisplay().getRotation();
                 // Calculate total rotation
                 int totalRotation = sensorToDeviceRotation(cameraCharacteristics, deviceOrientation);
 
@@ -317,7 +321,7 @@ public class ASUForia extends AppCompatActivity {
 
 
     private void connectCamera() {
-        CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        CameraManager cameraManager = (CameraManager) myAct.getSystemService(Context.CAMERA_SERVICE);
         try {
             cameraManager.openCamera(myCameraID, myStateCallback, myBackgroundHandler);
         } catch (CameraAccessException e) {
@@ -417,7 +421,7 @@ public class ASUForia extends AppCompatActivity {
 
                         @Override
                         public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
-                            Toast.makeText(getApplicationContext(),
+                            Toast.makeText(myAct.getApplicationContext(),
                                     "Unable to setup camera preview", Toast.LENGTH_SHORT).show();
                         }
                     }, null);
