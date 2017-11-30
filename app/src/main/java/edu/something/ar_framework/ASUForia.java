@@ -2,6 +2,7 @@ package edu.something.ar_framework;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
@@ -29,6 +30,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import org.opencv.*;
+import org.opencv.features2d.FeatureDetector;
+import org.opencv.features2d.ORB;
+
 
 public class ASUForia {
 
@@ -46,9 +51,14 @@ public class ASUForia {
     private PoseListener mylistener;
     private Activity myAct;
     /*************************************** ASUForia Constructor ***************************************/
-    ASUForia(PoseListener listener_arg, Image referenceImage, Surface cameraSurface, Activity act) {
+    ASUForia(PoseListener listener_arg, Bitmap referenceImage, Surface cameraSurface, Activity act) {
         mylistener = listener_arg;
         myAct = act;
+
+        // Call nativeFeatureDetection() to get features for reference image. Returned reference points need to be saved
+        nativeFeatureDetection(referenceImage);
+
+
     }
 
 
@@ -99,6 +109,10 @@ public class ASUForia {
         else {
             myTextureView.setSurfaceTextureListener(mySurfaceTextureListener);
         }
+
+
+
+        // Nothing else to do in this function - linked to onImageAvailable() by setupCamera() and connectCamera()
 
     }
     /*************************************** End startEstimation() **************************************/
@@ -495,11 +509,16 @@ public class ASUForia {
 
 
 
-
     /*************************************** nativePoseEstimation Definition ****************************/
     /**
      * A native method that is implemented by the 'native-lib' native library,
-     * which is packaged with this application.
+     * which is packaged with this application. CALL THESE FUNCTIONS ABOVE
      */
+    // Native method for pose estimation in OpenCV
     public native String nativePoseEstimation();
+
+    // Native method for getting ORB features in OpenCV
+    public native String nativeFeatureDetection(Bitmap referenceImage);
+
+
 }

@@ -67,7 +67,8 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         /**
-        Import reference jpg image as Bitmap (3 lines of code below code copied and pasted from project 1)
+        Import reference jpg image as Bitmap (3 lines of code below code based on project 1). Can keep image as Bitmap
+         until it reaches C++ world, then will be converted to Mat for use with OpenCV.
          */
         BitmapFactory.Options opts = new BitmapFactory.Options();
         opts.inPreferredConfig = Bitmap.Config.ARGB_8888; // Each pixel is 4 bytes: Alpha, Red, Green, Blue
@@ -84,15 +85,23 @@ public class MainActivity extends AppCompatActivity {
             }
 
         };
-//
-        Mat mat = new Mat(bmpIn.getHeight(), bmpIn.getWidth(), CvType.CV_8UC3);
-        Utils.bitmapToMat(bmpIn, mat);
 
-        Image refImage = null;
-        Surface cameraSurface = null;
+        //TODO: Implement this in C++ - nativeFeatureDetection()
+
+//        Mat mat = new Mat(bmpIn.getHeight(), bmpIn.getWidth(), CvType.CV_8UC3);
+//        Utils.bitmapToMat(bmpIn, mat);
+
+        // This will probably need to be Texture instead of Surface since we are using TextureView. "Whatever it needs
+        // to be for it to work is fine" -Robert
+        Surface cameraSurface = null; // can change to texture if needed
 
         //TODO: Create an ASUForia object
-       asuforia = new ASUForia(myPoseListener, refImage, cameraSurface, this);
+       asuforia = new ASUForia(myPoseListener, bmpIn, cameraSurface, this);
+       /*
+       This function is going to pass bitmap to ASUForia, then ASUForia is linked to native-lib through line at bottom
+       "public native String nativeFeatureDetection();". Then, once in C++, Bitmap can be converted to Mat. OpenCV will
+       need to use Mat data type for all methods.
+        */
 
 
 
