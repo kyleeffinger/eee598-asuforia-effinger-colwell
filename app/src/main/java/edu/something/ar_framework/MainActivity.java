@@ -10,6 +10,9 @@ import android.view.Surface;
 import android.view.TextureView;
 
 import static org.opencv.core.Core.VERSION;
+import org.opencv.android.Utils;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -63,6 +66,9 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        /**
+        Import reference jpg image as Bitmap (3 lines of code below code copied and pasted from project 1)
+         */
         BitmapFactory.Options opts = new BitmapFactory.Options();
         opts.inPreferredConfig = Bitmap.Config.ARGB_8888; // Each pixel is 4 bytes: Alpha, Red, Green, Blue
         bmpIn = BitmapFactory.decodeResource(getResources(), R.drawable.referenceimage, opts);
@@ -78,6 +84,9 @@ public class MainActivity extends AppCompatActivity {
             }
 
         };
+//
+        Mat mat = new Mat(bmpIn.getHeight(), bmpIn.getWidth(), CvType.CV_8UC3);
+        Utils.bitmapToMat(bmpIn, mat);
 
         Image refImage = null;
         Surface cameraSurface = null;
